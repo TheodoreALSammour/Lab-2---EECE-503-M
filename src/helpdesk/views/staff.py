@@ -14,7 +14,8 @@ import re
 from collections import defaultdict
 from copy import deepcopy
 from datetime import datetime, timedelta
-
+import os
+from django.http import HttpResponseForbidden
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
@@ -1457,16 +1458,14 @@ def debug_info(request):
 
 @helpdesk_staff_member_required
 def download_attachment(request):
-    """Download an attachment by its stored path under the media directory."""
-    import os
+    path = request.GET.get("path")
+    full_path = os.path.normpath(os.path.join(settings.MEDIA_ROOT, path))
+    media_root_resolved = os.path.realpath(settings.MEDIA_ROOT)
 
-    rel = request.GET.get("path", "")
-    full = os.path.join(settings.MEDIA_ROOT, rel)
-    with open(full, "rb") as handle:
-        data = handle.read()
-    response = HttpResponse(data, content_type="application/octet-stream")
-    response["Content-Disposition"] = f'attachment; filename="{os.path.basename(rel)}"'
-    return response
+    if not os.path.realpath(full_path).startswith(media_root_resolved):
+        return HttpResponseForbidden("Invalid path")
+
+    return open(full_path, "rb").read()
 
 
 @helpdesk_staff_member_required
